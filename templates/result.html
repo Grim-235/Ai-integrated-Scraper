@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Extraction & Analysis</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        body {
+            background: radial-gradient(circle at top left, #0f172a, #020617);
+            min-height: 100vh;
+            font-family: 'Inter', system-ui, sans-serif;
+            color: #f8fafc;
+            margin: 0;
+            overflow-x: hidden;
+        }
+
+        /* Ambient Background Glows */
+        .glow-orb { position: fixed; width: 50vw; height: 50vw; background: radial-gradient(circle, rgba(59,130,246,0.1) 0%, rgba(0,0,0,0) 70%); top: -25vw; left: -25vw; z-index: 0; pointer-events: none; }
+        .glow-orb-2 { position: fixed; width: 40vw; height: 40vw; background: radial-gradient(circle, rgba(139,92,246,0.1) 0%, rgba(0,0,0,0) 70%); bottom: -20vw; right: -20vw; z-index: 0; pointer-events: none; }
+
+        .main-container { z-index: 1; position: relative; }
+
+        .gradient-text { background: linear-gradient(to right, #60a5fa, #a78bfa); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; font-weight: 800; }
+
+        /* Status Bar */
+        .status-bar { background: rgba(30, 41, 59, 0.6); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 16px; padding: 1.25rem; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+
+        /* Product Cards */
+        .glass-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; overflow: hidden; transition: all 0.3s ease; display: flex; flex-direction: column; height: 100%; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3); }
+        .glass-card:hover { transform: translateY(-6px); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 0 15px rgba(59, 130, 246, 0.3); border-color: rgba(96, 165, 250, 0.5); }
+        .card-img-wrapper { width: 100%; height: 200px; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; overflow: hidden; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .card-img-wrapper img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s ease; }
+        .glass-card:hover .card-img-wrapper img { transform: scale(1.05); }
+
+        /* Sticky AI Chat Panel */
+        .chat-panel { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 16px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5); display: flex; flex-direction: column; height: calc(100vh - 6rem); position: sticky; top: 2rem; overflow: hidden; }
+        .terminal-header { background: rgba(255, 255, 255, 0.02); padding: 1rem 1.5rem; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+        .chat-messages { flex-grow: 1; overflow-y: auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
+        
+        .message { max-width: 90%; padding: 0.85rem 1.2rem; border-radius: 14px; font-size: 0.95rem; line-height: 1.5; }
+        .msg-user { background: linear-gradient(135deg, #3b82f6, #4f46e5); color: white; align-self: flex-end; border-bottom-right-radius: 4px; box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3); }
+        .msg-ai { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #e2e8f0; align-self: flex-start; border-bottom-left-radius: 4px; }
+
+        .chat-input-area { padding: 1rem; border-top: 1px solid rgba(255, 255, 255, 0.05); background: rgba(0, 0, 0, 0.3); display: flex; gap: 0.5rem; }
+        .chat-input { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); color: white; border-radius: 30px; padding: 0.6rem 1.2rem; width: 100%; outline: none; transition: border-color 0.2s; }
+        .chat-input:focus { border-color: #3b82f6; }
+        .btn-send { background: linear-gradient(135deg, #3b82f6, #6366f1); border: none; border-radius: 50%; width: 44px; height: 44px; color: white; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: transform 0.2s; }
+        .btn-send:hover { transform: scale(1.08); }
+
+        /* Compare Box */
+        .compare-box { background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 2.5rem; margin-top: 4rem; backdrop-filter: blur(12px); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+        .btn-primary-custom { background: linear-gradient(135deg, #3b82f6, #6366f1); border: none; border-radius: 40px; padding: 0.75rem 2rem; font-weight: 600; color: white; transition: all 0.2s; width: 100%; }
+        .btn-primary-custom:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.4); color: white; }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 3px; }
+    </style>
+</head>
+<body>
+
+<div class="glow-orb"></div>
+<div class="glow-orb-2"></div>
+
+<div class="container-fluid main-container py-4 px-md-5">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="h3 gradient-text mb-0"><i class="bi bi-radar me-2"></i>Extraction Engine</h2>
+        <a href="/" class="btn btn-outline-secondary btn-sm rounded-pill px-4 text-white border-secondary"><i class="bi bi-arrow-left me-2"></i>New Query</a>
+    </div>
+
+    <div id="scraped-content" style="display: none;">{{ raw_content }}</div>
+
+    <div class="row g-4">
+        
+        <div class="col-lg-8">
+            
+            <div class="status-bar">
+                <div>
+                    <div class="text-secondary small text-uppercase fw-bold" style="letter-spacing: 1px;">Target Source</div>
+                    <div class="text-info fw-bold fs-5 text-truncate" style="max-width: 500px;">{{ title }}</div>
+                </div>
+                <div class="text-end">
+                    <span class="badge bg-dark border border-secondary text-light px-3 py-2 rounded-pill {{ category_color }} shadow-sm">{{ category }}</span>
+                </div>
+            </div>
+
+            {% if enrichment %}
+            <div class="alert alert-dark border-info border-opacity-25 text-light d-flex align-items-center rounded-4 mb-4" style="background: rgba(13, 202, 240, 0.05);" role="alert">
+                <i class="bi bi-info-circle-fill text-info fs-4 me-3"></i>
+                <div style="font-size: 0.9rem;">{{ enrichment }}</div>
+            </div>
+            {% endif %}
+
+            <div class="row row-cols-1 row-cols-md-2 g-4 mb-5">
+                {% for item in content_list %}
+                <div class="col">
+                    <div class="glass-card">
+                        {% if item.image_url %}
+                        <div class="card-img-wrapper">
+                            <img src="{{ item.image_url }}" alt="Parsed Image" onerror="this.style.display='none'">
+                        </div>
+                        {% endif %}
+                        <div class="card-body p-4">
+                            <h5 class="card-title text-light fw-bold mb-3">{{ item.title }}</h5>
+                            
+                            <div class="d-flex justify-content-between align-items-center border-bottom border-light border-opacity-10 pb-3 mb-3">
+                                <div>
+                                    <div class="text-secondary small text-uppercase" style="font-size: 0.7rem; letter-spacing: 1px;">Metric Price</div>
+                                    <div class="text-success fw-bold fs-5">{{ item.price }}</div>
+                                </div>
+                                <div class="text-end">
+                                    <div class="text-secondary small text-uppercase" style="font-size: 0.7rem; letter-spacing: 1px;">AI Rating</div>
+                                    <div class="text-warning fw-bold"><i class="bi bi-star-fill me-1"></i>{{ item.rating }}</div>
+                                </div>
+                            </div>
+                            
+                            <p class="card-text text-secondary" style="font-size: 0.9rem; line-height: 1.6;">{{ item.summary }}</p>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="compare-box">
+                <h4 class="text-light mb-2"><i class="bi bi-intersect text-primary me-2"></i>Cross-Reference Analysis</h4>
+                <p class="text-secondary small mb-4">Initialize the comparison engine to benchmark this data against a secondary target URL.</p>
+
+                <form action="/compare" method="post">
+                    <input type="hidden" name="url1" value="{{ original_url }}">
+                    <input type="hidden" name="title1" value="{{ title }}">
+                    <input type="hidden" name="content_list1" value="{{ content_list | tojson | forceescape }}">
+                    <input type="hidden" name="category1" value="{{ category }}">
+                    <input type="hidden" name="raw_content1" value="{{ raw_content }}">
+                    
+                    <div class="row g-3">
+                        <div class="col-md-9">
+                            <div class="input-group">
+                                <span class="input-group-text bg-dark border-secondary text-secondary"><i class="bi bi-link-45deg"></i></span>
+                                <input type="url" name="url2" class="form-control bg-dark border-secondary text-light" placeholder="https://example.com/target-2" required>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <button type="submit" class="btn btn-primary-custom w-100">Execute</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+        </div>
+
+        <div class="col-lg-4">
+            <div class="chat-panel">
+                <div class="terminal-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="bi bi-robot text-primary me-2 fs-5"></i>
+                        <span class="text-light fw-bold" style="letter-spacing: 0.5px;">Intelligence Core</span>
+                    </div>
+                    <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill">Online</span>
+                </div>
+                
+                <div class="chat-messages" id="chat-box">
+                    <div class="message msg-ai">
+                        Extraction and JSON structuring complete. The data matrix has been rendered. How can I analyze this for you?
+                    </div>
+                </div>
+
+                <div class="chat-input-area">
+                    <input type="text" id="chat-input" class="chat-input" placeholder="Query the matrix..." autocomplete="off">
+                    <button id="send-btn" class="btn-send"><i class="bi bi-send-fill"></i></button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    const chatBox = document.getElementById('chat-box');
+    const chatInput = document.getElementById('chat-input');
+    const sendBtn = document.getElementById('send-btn');
+    const scrapedContent = document.getElementById('scraped-content').innerText;
+
+    function appendUserMessage(text) {
+        const msgDiv = document.createElement('div');
+        msgDiv.classList.add('message', 'msg-user');
+        msgDiv.innerText = text;
+        chatBox.appendChild(msgDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function typeWriterEffect(element, text, speed = 15) {
+        let i = 0; element.innerHTML = "";
+        function type() {
+            if (i < text.length) {
+                if (text.charAt(i) === '<') {
+                    let tag = "";
+                    while (text.charAt(i) !== '>' && i < text.length) { tag += text.charAt(i); i++; }
+                    tag += '>'; element.innerHTML += tag;
+                } else { element.innerHTML += text.charAt(i); i++; }
+                chatBox.scrollTop = chatBox.scrollHeight; 
+                setTimeout(type, speed);
+            }
+        }
+        type();
+    }
+
+    async function sendMessage() {
+        const message = chatInput.value.trim();
+        if (!message) return;
+        
+        appendUserMessage(message);
+        chatInput.value = '';
+        
+        const loadingId = 'loading-' + Date.now();
+        chatBox.insertAdjacentHTML('beforeend', `<div id="${loadingId}" class="message msg-ai text-secondary"><i>Analyzing matrix...</i></div>`);
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+        try {
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: message, context: scrapedContent })
+            });
+            const data = await response.json();
+            document.getElementById(loadingId).remove();
+            
+            const aiMsgDiv = document.createElement('div');
+            aiMsgDiv.classList.add('message', 'msg-ai');
+            chatBox.appendChild(aiMsgDiv);
+            
+            let html = data.reply.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\*(.*?)\*/g, '<em>$1</em>').replace(/\n/g, '<br>');
+            typeWriterEffect(aiMsgDiv, html);
+        } catch (error) {
+            document.getElementById(loadingId).remove();
+            chatBox.insertAdjacentHTML('beforeend', `<div class="message msg-ai text-danger">Connection error to AI Core.</div>`);
+        }
+    }
+
+    sendBtn.addEventListener('click', sendMessage);
+    chatInput.addEventListener('keypress', e => { if (e.key === 'Enter') sendMessage(); });
+</script>
+
+</body>
+</html>

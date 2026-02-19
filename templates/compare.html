@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cross-Reference Analysis</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        body { 
+            background: radial-gradient(circle at top left, #0f172a, #020617); 
+            min-height: 100vh; 
+            font-family: 'Inter', system-ui, sans-serif; 
+            color: #f8fafc; 
+            margin: 0; 
+            overflow-x: hidden; 
+        }
+        .glow-orb { position: fixed; width: 50vw; height: 50vw; background: radial-gradient(circle, rgba(59,130,246,0.1) 0%, rgba(0,0,0,0) 70%); top: -25vw; left: -25vw; z-index: 0; pointer-events: none; }
+        .glow-orb-2 { position: fixed; width: 40vw; height: 40vw; background: radial-gradient(circle, rgba(139,92,246,0.1) 0%, rgba(0,0,0,0) 70%); bottom: -20vw; right: -20vw; z-index: 0; pointer-events: none; }
+        .main-container { z-index: 1; position: relative; }
+        .gradient-text { background: linear-gradient(to right, #60a5fa, #a78bfa); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; font-weight: 800; }
+
+        .similarity-card { background: rgba(30, 41, 59, 0.6); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 16px; padding: 1.5rem; text-align: center; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); margin-bottom: 2rem; }
+
+        .glass-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; overflow: hidden; transition: all 0.3s ease; display: flex; flex-direction: column; height: 100%; }
+        .glass-card:hover { transform: translateY(-4px); box-shadow: 0 15px 20px -5px rgba(0, 0, 0, 0.4); border-color: rgba(96, 165, 250, 0.5); }
+        .card-img-wrapper { width: 100%; height: 160px; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; overflow: hidden; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .card-img-wrapper img { width: 100%; height: 100%; object-fit: cover; }
+
+        .chat-panel { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 16px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.5); display: flex; flex-direction: column; height: calc(100vh - 6rem); position: sticky; top: 2rem; overflow: hidden; }
+        .terminal-header { background: rgba(255, 255, 255, 0.02); padding: 1rem 1.5rem; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+        .chat-messages { flex-grow: 1; overflow-y: auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
+        
+        .message { max-width: 90%; padding: 0.85rem 1.2rem; border-radius: 14px; font-size: 0.95rem; line-height: 1.5; }
+        .msg-user { background: linear-gradient(135deg, #3b82f6, #4f46e5); color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+        .msg-ai { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #e2e8f0; align-self: flex-start; border-bottom-left-radius: 4px; }
+
+        .chat-input-area { padding: 1rem; border-top: 1px solid rgba(255, 255, 255, 0.05); background: rgba(0, 0, 0, 0.3); display: flex; gap: 0.5rem; }
+        .chat-input { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); color: white; border-radius: 30px; padding: 0.6rem 1.2rem; width: 100%; outline: none; }
+        .btn-send { background: linear-gradient(135deg, #3b82f6, #6366f1); border: none; border-radius: 50%; width: 44px; height: 44px; color: white; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: transform 0.2s; }
+        .btn-send:hover { transform: scale(1.08); }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 3px; }
+    </style>
+</head>
+<body>
+
+<div class="glow-orb"></div>
+<div class="glow-orb-2"></div>
+
+<div class="container-fluid main-container py-4 px-md-5">
+    
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="h3 gradient-text mb-0"><i class="bi bi-intersect me-2"></i>Cross-Reference Matrix</h2>
+        <a href="/" class="btn btn-outline-secondary btn-sm rounded-pill px-4 text-white border-secondary"><i class="bi bi-arrow-left me-2"></i>New Query</a>
+    </div>
+
+    <div class="row g-4">
+        
+        <div class="col-lg-8">
+            
+            <div class="similarity-card">
+                <h6 class="text-secondary text-uppercase mb-2" style="letter-spacing: 1px;">Vector Similarity Score</h6>
+                <h1 class="display-5 fw-bold mb-0 {% if similarity > 75 %}text-success{% elif similarity > 40 %}text-warning{% else %}text-danger{% endif %}">{{ similarity }}%</h1>
+            </div>
+
+            <div class="row g-4 mb-5">
+                <div class="col-md-6 border-end border-secondary border-opacity-25">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span class="text-info fw-bold text-truncate" style="max-width: 70%;">{{ title1 }}</span>
+                        <span class="badge bg-dark border border-secondary text-light">{{ category1 }}</span>
+                    </div>
+                    <div id="raw-1" style="display: none;">{{ raw_content1 }}</div>
+                    
+                    <div class="row row-cols-1 g-3">
+                        {% for item in content_list1 %}
+                        <div class="col">
+                            <div class="glass-card">
+                                {% if item.image_url %}
+                                <div class="card-img-wrapper"><img src="{{ item.image_url }}" onerror="this.style.display='none'"></div>
+                                {% endif %}
+                                <div class="card-body p-3">
+                                    <h6 class="card-title text-light fw-bold mb-2">{{ item.title }}</h6>
+                                    <div class="d-flex justify-content-between border-bottom border-light border-opacity-10 pb-2 mb-2">
+                                        <span class="text-success fw-bold small">{{ item.price }}</span>
+                                        <span class="text-warning small"><i class="bi bi-star-fill me-1"></i>{{ item.rating }}</span>
+                                    </div>
+                                    <p class="card-text text-secondary" style="font-size: 0.8rem;">{{ item.summary }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <span class="text-info fw-bold text-truncate" style="max-width: 70%;">{{ title2 }}</span>
+                        <span class="badge bg-dark border border-secondary text-light">{{ category2 }}</span>
+                    </div>
+                    <div id="raw-2" style="display: none;">{{ raw_content2 }}</div>
+
+                    <div class="row row-cols-1 g-3">
+                        {% for item in content_list2 %}
+                        <div class="col">
+                            <div class="glass-card">
+                                {% if item.image_url %}
+                                <div class="card-img-wrapper"><img src="{{ item.image_url }}" onerror="this.style.display='none'"></div>
+                                {% endif %}
+                                <div class="card-body p-3">
+                                    <h6 class="card-title text-light fw-bold mb-2">{{ item.title }}</h6>
+                                    <div class="d-flex justify-content-between border-bottom border-light border-opacity-10 pb-2 mb-2">
+                                        <span class="text-success fw-bold small">{{ item.price }}</span>
+                                        <span class="text-warning small"><i class="bi bi-star-fill me-1"></i>{{ item.rating }}</span>
+                                    </div>
+                                    <p class="card-text text-secondary" style="font-size: 0.8rem;">{{ item.summary }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="chat-panel">
+                <div class="terminal-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="bi bi-robot text-primary me-2 fs-5"></i>
+                        <span class="text-light fw-bold" style="letter-spacing: 0.5px;">Comparison Core</span>
+                    </div>
+                    <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill">Online</span>
+                </div>
+                
+                <div class="chat-messages" id="chat-box">
+                    <div class="message msg-ai">Both sources analyzed and rendered. What insights can I provide regarding the comparison?</div>
+                </div>
+
+                <div class="chat-input-area">
+                    <input type="text" id="chat-input" class="chat-input" placeholder="Query the matrix..." autocomplete="off">
+                    <button id="send-btn" class="btn-send"><i class="bi bi-send-fill"></i></button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    const chatBox = document.getElementById('chat-box');
+    const chatInput = document.getElementById('chat-input');
+    const sendBtn = document.getElementById('send-btn');
+    const combinedContext = "SOURCE 1:\n" + document.getElementById('raw-1').innerText + "\n\nSOURCE 2:\n" + document.getElementById('raw-2').innerText;
+
+    function appendUserMessage(text) {
+        const msgDiv = document.createElement('div');
+        msgDiv.classList.add('message', 'msg-user');
+        msgDiv.innerText = text;
+        chatBox.appendChild(msgDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function typeWriterEffect(element, text, speed = 15) {
+        let i = 0; element.innerHTML = "";
+        function type() {
+            if (i < text.length) {
+                if (text.charAt(i) === '<') {
+                    let tag = "";
+                    while (text.charAt(i) !== '>' && i < text.length) { tag += text.charAt(i); i++; }
+                    tag += '>'; element.innerHTML += tag;
+                } else { element.innerHTML += text.charAt(i); i++; }
+                chatBox.scrollTop = chatBox.scrollHeight; 
+                setTimeout(type, speed);
+            }
+        }
+        type();
+    }
+
+    async function sendMessage() {
+        const message = chatInput.value.trim();
+        if (!message) return;
+        
+        appendUserMessage(message);
+        chatInput.value = '';
+        
+        const loadingId = 'loading-' + Date.now();
+        chatBox.insertAdjacentHTML('beforeend', `<div id="${loadingId}" class="message msg-ai text-secondary"><i>Analyzing dual sources...</i></div>`);
+        chatBox.scrollTop = chatBox.scrollHeight;
+
+        try {
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: message, context: combinedContext })
+            });
+            const data = await response.json();
+            document.getElementById(loadingId).remove();
+            
+            const aiMsgDiv = document.createElement('div');
+            aiMsgDiv.classList.add('message', 'msg-ai');
+            chatBox.appendChild(aiMsgDiv);
+            
+            let html = data.reply.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\*(.*?)\*/g, '<em>$1</em>').replace(/\n/g, '<br>');
+            typeWriterEffect(aiMsgDiv, html);
+        } catch (error) {
+            document.getElementById(loadingId).remove();
+            chatBox.insertAdjacentHTML('beforeend', `<div class="message msg-ai text-danger">Connection error.</div>`);
+        }
+    }
+
+    sendBtn.addEventListener('click', sendMessage);
+    chatInput.addEventListener('keypress', e => { if (e.key === 'Enter') sendMessage(); });
+</script>
+
+</body>
+</html>
