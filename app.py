@@ -5,7 +5,7 @@ import json
 import random
 import requests
 from bs4 import BeautifulSoup
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_from_directory
 from sklearn.metrics.pairwise import cosine_similarity
 from dotenv import load_dotenv
 from google import genai
@@ -13,10 +13,48 @@ from google import genai
 load_dotenv()
 
 app = Flask(__name__)
-client = genai.Client()
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+GEMINI_MODEL = "gemini-2.5-flash"
 
 with open("model.pkl", "rb") as f:
     vectorizer, model = pickle.load(f)
+
+def load_gemini_clients():
+    clients = []
+    key_names = ["GEMINI_API_KEY", "GEMINI_API_KEY_2", "GEMINI_API_KEY_3"]
+
+    for key_name in key_names:
+        api_key = os.getenv(key_name)
+        if api_key:
+            clients.append((key_name, genai.Client(api_key=api_key)))
+
+    if not clients:
+        clients.append(("DEFAULT_ENV", genai.Client()))
+
+    return clients
+
+GEMINI_CLIENTS = load_gemini_clients()
+
+def generate_content_with_fallback(contents):
+    last_error = None
+    quota_errors = []
+
+    for key_name, gemini_client in GEMINI_CLIENTS:
+        try:
+            response = gemini_client.models.generate_content(model=GEMINI_MODEL, contents=contents)
+            return response, key_name, None
+        except Exception as e:
+            error_text = str(e)
+            last_error = e
+            print(f"Gemini request failed on {key_name}: {error_text}")
+
+            if "429" in error_text or "RESOURCE_EXHAUSTED" in error_text or "quota" in error_text.lower():
+                quota_errors.append(key_name)
+                continue
+
+            return None, key_name, e
+
+    return None, None, last_error or Exception("No Gemini clients available.")
 
 # =========================
 # ADVANCED SCRAPER LOGIC
@@ -73,7 +111,7 @@ def ai_extract_to_json(url, title, raw_data):
     Page Title: {title}
     Raw Web Data & Images: {raw_data}
     
-    TASK: Analyze the text and the "IMAGES FOUND" list. Extract the main items (up to 4).
+    TASK: Analyze the text and the "IMAGES FOUND" list. Extract the main items (up to 15).
     If price or rating is missing, YOU MUST estimate a realistic numerical value based on the item name.
     Correlate the most relevant image URL to the item based on the alt text. If none matches, leave it blank.
     
@@ -91,13 +129,38 @@ def ai_extract_to_json(url, title, raw_data):
     ]
     """
     try:
-        response = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
+        response, used_key, error = generate_content_with_fallback(prompt)
+        if error:
+            raise error
         cleaned_json = response.text.replace("```json", "").replace("```", "").strip()
         data = json.loads(cleaned_json)
-        return data
+        return data, f"Structured extraction completed using {used_key}."
     except Exception as e:
-        print(f"JSON Parsing Error: {e}")
-        return [{"title": "AI Parsing Failed", "price": "N/A", "rating": "N/A", "summary": "The AI failed to format the data into JSON.", "image_url": ""}]
+        error_text = str(e)
+        print(f"JSON Parsing Error: {error_text}")
+
+        if "429" in error_text or "RESOURCE_EXHAUSTED" in error_text or "quota" in error_text.lower():
+            return (
+                [{
+                    "title": "AI quota reached",
+                    "price": "N/A",
+                    "rating": "N/A",
+                    "summary": "The page was scraped, but all configured Gemini API keys are currently quota-limited. Try again after the retry window or switch to a billed plan/model.",
+                    "image_url": ""
+                }],
+                "All configured Gemini API keys have reached quota for the current model, so structured AI extraction is temporarily unavailable."
+            )
+
+        return (
+            [{
+                "title": "AI Parsing Failed",
+                "price": "N/A",
+                "rating": "N/A",
+                "summary": "The page was scraped, but the AI response could not be converted into structured JSON.",
+                "image_url": ""
+            }],
+            "The scrape completed, but the AI response could not be parsed into the expected JSON structure."
+        )
 
 # =========================
 # APPLICATION ROUTES
@@ -106,15 +169,25 @@ def ai_extract_to_json(url, title, raw_data):
 def home():
     return render_template('index.html')
 
+@app.route('/college-logo')
+def college_logo():
+    return send_from_directory(BASE_DIR, 'WhatsApp_Image_2026-02-17_at_13.29.51-removebg-preview.png')
+
+@app.route('/project-report')
+def project_report():
+    return send_from_directory(BASE_DIR, 'AI_Web_Scraper_Report_Final.docx.pdf')
+
 @app.route('/scrape', methods=['POST'])
 def scrape():
     start_time = time.time()
     url = request.form['url']
     
     title, raw_data, category = universal_scrape(url)
-    json_content = ai_extract_to_json(url, title, raw_data)
+    json_content, ai_notice = ai_extract_to_json(url, title, raw_data)
     
     enrichment = "Notice: Extracted using rotating headers. Missing metrics estimated. UI generated dynamically via JSON payload."
+    if ai_notice:
+        enrichment = f"{enrichment} {ai_notice}"
     elapsed = round(time.time() - start_time, 2)
     
     category_color = {"Technology": "text-info", "Health": "text-success", "Sports": "text-warning", "Politics": "text-danger", "Entertainment": "text-primary"}.get(category, "text-secondary")
@@ -139,9 +212,11 @@ def compare():
     # Process Source 2 natively
     url2 = request.form['url2']
     title2, raw_content2, category2 = universal_scrape(url2)
-    content_list2 = ai_extract_to_json(url2, title2, raw_content2)
+    content_list2, ai_notice2 = ai_extract_to_json(url2, title2, raw_content2)
     
     disclaimer = "UI generated dynamically via cross-reference JSON payload."
+    if ai_notice2:
+        disclaimer = f"{disclaimer} {ai_notice2}"
 
     if raw_content1 and raw_content2:
         vectors = vectorizer.transform([raw_content1, raw_content2])
@@ -170,11 +245,13 @@ def chat():
     prompt = f"Website Data:\n{scraped_context}\n\nUser Question:\n{user_message}"
     
     try:
-        response = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
+        response, used_key, error = generate_content_with_fallback(prompt)
+        if error:
+            raise error
         return jsonify({"reply": response.text})
     except Exception as e:
         print(f"Chat Route Error: {e}")
-        return jsonify({"reply": "AI connection error. Check backend logs."})
+        return jsonify({"reply": "AI connection error across configured Gemini keys. Check backend logs."})
 
 if __name__ == '__main__':
     app.run(debug=True)
